@@ -1,4 +1,3 @@
-
 'use client';
 
 import {useState} from 'react';
@@ -9,31 +8,12 @@ import {generateCsv} from '@/ai/flows/csv-generator';
 import {Download, Upload} from 'lucide-react';
 import {toast} from '@/hooks/use-toast';
 import {useRouter} from 'next/navigation';
-
-export default function Home() {
+import {generateCsv as generateCsvAction} from '@/ai/flows/csv-generator';
+import {useActionState} from 'react';
+export default function Home({csvData: initialCsvData}: {csvData: string | null}) {
   const [content, setContent] = useState('');
   const [instructions, setInstructions] = useState('');
-  const [csvData, setCsvData] = useState<string | null>(null);
-  const router = useRouter();
 
-  const handleGenerateCsv = async () => {
-    try {
-      const result = await generateCsv({content, instructions});
-      setCsvData(result.csvData);
-      toast({
-        title: 'CSV generated!',
-        description: 'Click download to save the file.',
-      });
-      router.refresh();
-    } catch (error: any) {
-      console.error('Error generating CSV:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.message || 'Failed to generate CSV.',
-      });
-    }
-  };
 
   const handleDownloadCsv = () => {
     if (!csvData) {
@@ -55,9 +35,14 @@ export default function Home() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
-
+  const [csvData, setCsvData] = useState<string | null>(initialCsvData ?? null);
+  const [isLoading, formAction] = useActionState(async (state, data: FormData) => {
+    const result = await generateCsvAction({content: data.get('content') as string, instructions: data.get('instructions') as string});
+    setCsvData(result?.csvData ?? null);
+    return false;
+  });
   return (
-    <div className="container mx-auto p-4 flex flex-col gap-4">
+    <div className="mx-auto p-4 gap-4">
       <h1 className="text-2xl font-bold">Structurize.me</h1>
 
       {/* Content Input */}
@@ -85,20 +70,20 @@ export default function Home() {
           onChange={e => setInstructions(e.target.value)}
         />
       </div>
+      
+      <form action={formAction}>
+        <Button type='submit' disabled={isLoading} className="bg-teal hover:bg-teal-700 text-white font-bold py-2 px-4 rounded">
+          <Upload className="mr-2 h-4 w-4"/>
+          {isLoading ? 'Generating...' : 'Generate CSV'}
+        </Button>
+        <input type="hidden" name="content" value={content}/>
+        <input type="hidden" name="instructions" value={instructions}/>
+     </form>
 
-      {/* Generate CSV Button */}
-      <Button onClick={handleGenerateCsv} className="bg-teal hover:bg-teal-700 text-white font-bold py-2 px-4 rounded">
-        <Upload className="mr-2 h-4 w-4" />
-        Generate CSV
-      </Button>
-
-      {/* Download CSV Button */}
-      {csvData && (
-        <Button onClick={handleDownloadCsv} className="bg-teal hover:bg-teal-700 text-white font-bold py-2 px-4 rounded">
+      
+      <Button onClick={handleDownloadCsv} disabled={!csvData} className="bg-teal hover:bg-teal-700 text-white font-bold py-2 px-4 rounded">
           <Download className="mr-2 h-4 w-4" />
           Download CSV
-        </Button>
-      )}
+      </Button>
     </div>
   );
-}
